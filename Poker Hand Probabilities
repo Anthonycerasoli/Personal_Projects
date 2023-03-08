@@ -1,0 +1,239 @@
+class PyPoker:
+    def __init__(self, hole, holeS, community, comS):
+        import numpy as np
+        import statistics as stat
+        self.np = np
+        self.stat = stat
+        self.hole = hole
+        self.community = community
+        self.hs = holeS
+        self.cs = comS
+        self.deck = 52 
+        self.spades = 13
+        self.diamonds = 13
+        self.clubs = 13
+        self.hearts = 13
+        self.two = 4
+        self.three = 4
+        self.four = 4
+        self.five = 4
+        self.six = 4
+        self.seven = 4
+        self.eight = 4 
+        self.nine = 4
+        self.ten = 4
+        self.jack = 4
+        self.queen = 4
+        self.king = 4
+        self.ace = 4
+        self.suits = [self.spades, self.diamonds, self.clubs, self.hearts]
+        self.ranks = [self.two, self.three, self.four, self.five, self.six, self.seven, self.eight, self.nine, self.ten, self.jack, self.queen, self.king, self.ace]
+        self.knownRanks = self.hole + self.community
+        self.knownSuits = self.hs + self.cs
+        self.knownCounts = []
+        self.suitCounts = []
+        self.sorted = sorted(self.knownRanks)
+        for suit in self.knownSuits:
+            suitdict = {'S':0,'D':1,'C':2,'H':3}
+            self.suits[suitdict.get(suit)] = self.suits[suitdict.get(suit)] - 1
+            self.suitCounts.append(self.knownSuits.count(suit))
+        for rank in self.knownRanks:
+            self.ranks[rank - 2] = self.ranks[rank - 2] - 1
+            self.deck = self.deck - 1
+            self.knownCounts.append(self.knownRanks.count(rank))
+    
+    def dupl(self, items):
+        mylist = []
+        duplicates = [] 
+        for i in items:
+            if i not in mylist:
+                mylist.append(i)
+            else:
+                duplicates.append(i)           
+        return duplicates
+    
+    def delete(self, items, delete):
+        mylist = []
+        for i in items:
+            if i != delete:
+                mylist.append(i)
+        return mylist
+    
+    def card_counts(self):
+        return self.ranks
+    
+    def suit_counts(self):
+        return self.suits
+    
+    def card_prob(self, cards=['2','3','4','5','6','7','8','9','10','11','12','13','14']):
+        rankprob = [round(x/self.deck,4) for x in self.ranks]
+        ranklabels = ['2','3','4','5','6','7','8','9','10','11','12','13','14']
+        mydeck = {}
+        for r in range(len(ranklabels)):
+            mydeck[ranklabels[r]] = rankprob[r]
+        selected = [mydeck.get(str(select)) for select in list(cards)]
+        #print("Chance of getting at least one: " + str(round(sum(selected),4))),print("Chance of getting all: " + str(round(self.np.prod(selected),4)))
+        return selected
+    
+    def suit_prob(self, suit, n):
+        suitdict = {'S':0,'D':1,'C':2,'H':3}
+        suitget = suitdict.get(suit)
+        product = 1
+        for i in range(n):
+            fract = (self.suits[suitget]-i)/(self.deck-i)
+            product = product * fract
+        return round(product,4)
+    
+    def pair_prob(self):
+        if self.knownCounts.count(2) > 2 or self.knownCounts.count(3) > 1 or self.knownCounts.count(4) > 1:
+            pair = 0.0
+        elif self.knownCounts.count(2) == 2:
+            pair = 1.0
+        else:
+            pair = round(sum(self.card_prob(self.knownRanks)),4)
+        return pair
+    
+    def twopair_prob(self):
+        if self.knownCounts.count(3) > 1 or self.knownCounts.count(4) > 1:
+            two_pair = 0.0
+        elif self.knownCounts.count(2) >= 4:
+            two_pair = 1.0
+        elif self.knownCounts.count(2) == 2:
+            two_pair = round(sum(self.card_prob(self.delete(self.knownRanks,self.dupl(self.knownRanks)))),4)
+        else:
+            two_pair = round(self.np.prod(self.card_prob(self.hole)),4)
+        return two_pair
+    
+    def three_prob(self):
+        if self.knownCounts.count(4) >= 1 or (self.knownCounts.count(3) >= 1 and self.knownCounts.count(2) >= 1):
+            three = 0.0
+        elif self.knownCounts.count(3) >= 1:
+            three = 1.0
+        elif self.knownCounts.count(2) > 2:
+            three = round(max(self.card_prob(self.dupl(self.knownRanks))),4)
+        elif self.knownCounts.count(2) == 2:
+            t1 = self.card_prob(self.dupl(self.knownRanks))
+            three = round(t1[0],4)
+        else:
+            three = round(3/self.deck * 2/(self.deck-1),4)
+        return three
+    
+    def straight_prob(self):
+        runs = []
+        holes = []
+        fullrun = [2,3,4,5,6,7,8,9,10,11,12,13,14]
+        for i in fullrun:
+            run = []
+            hole = []
+            if i == 11:
+                break
+            else:
+                for j in range(i,i+5):
+                    if j in self.sorted:
+                        run.append(j)
+                    else: 
+                        hole.append(j)
+            runs.append(run)
+            if len(hole) > 0:
+                holes.append(hole)
+        straight_probs = [self.np.prod(self.card_prob(s)) for s in holes]
+        probsingl = []
+        ranksingl = []
+        for l in holes:
+            if len(l) == 1 and len(probsingl) < 2 and l not in ranksingl:
+                ranksingl.append(l)
+                probsingl.append(max(self.card_prob(l)))
+        straight_probs.append(sum(probsingl))
+        straight = round(max(straight_probs),4)
+        return straight
+    
+    def flush_prob(self):
+        if max(self.suitCounts) >= 5:
+            flush = 1.0
+        elif max(self.suitCounts) == 4:
+            flush = self.suit_prob(self.knownSuits[self.suitCounts.index(4)],1)
+        elif max(self.suitCounts) == 3:
+            flush = self.suit_prob(self.knownSuits[self.suitCounts.index(3)],2)
+        elif max(self.suitCounts) == 2:
+            flush = self.suit_prob(self.knownSuits[self.suitCounts.index(2)],3)
+        elif max(self.suitCounts) == 1:
+            flush = self.suit_prob(self.knownSuits[self.suitCounts.index(1)],4)
+        else:
+            flush = max(self.suit_prob(self.knownSuits,5))
+        return flush
+    
+    def fullhouse_prob(self): 
+        if self.knownCounts.count(3) >= 1:
+            full_house = round(sum(self.card_prob(self.delete(self.knownRanks,self.stat.mode(self.dupl(self.knownRanks))))),4)
+        elif self.knownCounts.count(2) > 2:
+            full_house = round(sum(self.card_prob(self.dupl(self.knownRanks))),4)
+        elif self.knownCounts.count(2) == 2:
+            full_house = round(max(self.card_prob(self.dupl(self.knownRanks))) * max(self.card_prob(set(self.knownRanks))),4)
+        else:
+            full_house = round(self.three_prob() * self.pair_prob(),4)
+        return full_house
+    
+    def quad_prob(self):
+        if self.knownCounts.count(4) >= 1:
+            quad = 1.0
+        elif self.knownCounts.count(3) > 1:
+            quad = (self.card_prob(self.dupl(self.dupl(self.knownRanks))))[0]
+        elif self.knownCounts.count(2) > 2:
+            quad = sum(self.card_prob(self.dupl(self.knownRanks)))**2
+        elif self.knownCounts.count(2) == 2:
+            quad = (self.card_prob(self.dupl(self.knownRanks)))[0]**2
+        else:
+            quad = 1
+            for q in range(3):
+                quad = quad * ((self.hole[0]-q)/(self.deck-q))
+        return round(quad,4)
+    
+    def straightflush_prob(self):
+        S_runs = []
+        D_runs = []
+        H_runs = []
+        C_runs = []
+        fullrun = [2,3,4,5,6,7,8,9,10,11,12,13,14]
+        for i in fullrun:
+            S_run = []
+            D_run = []
+            H_run = []
+            C_run = []
+            if i == 11:
+                break
+            else:
+                for j in range(i,i+5):
+                    if j in self.sorted:
+                        if self.knownSuits[self.knownRanks.index(j)] == 'S':
+                            S_run.append(j)
+                        elif self.knownSuits[self.knownRanks.index(j)] == 'D':
+                            D_run.append(j)
+                        elif self.knownSuits[self.knownRanks.index(j)] == 'H':
+                            H_run.append(j)
+                        elif self.knownSuits[self.knownRanks.index(j)] == 'C':
+                            C_run.append(j)
+            if len(S_run) > 0 and S_run not in S_runs:
+                S_runs.append(S_run)
+            if len(D_run) > 0 and D_run not in D_runs:
+                D_runs.append(D_run)
+            if len(H_run) > 0 and H_run not in H_runs:
+                H_runs.append(H_run)
+            if len(C_run) > 0 and C_run not in C_runs:
+                C_runs.append(C_run)
+        runs = S_runs + D_runs + H_runs + C_runs
+        straightflush = 1
+        for t in range(5-max([len(r) for r in runs])):
+            straightflush = straightflush * 1/(self.deck-t)
+        return round(straightflush,4)
+    
+    def hand_prob(self):
+        pair = self.pair_prob()
+        two_pair = self.twopair_prob()
+        three = self.three_prob()
+        straight = self.straight_prob()
+        flush = self.flush_prob()
+        fullhouse = self.fullhouse_prob()
+        quad = self.quad_prob()
+        straightflush = self.straightflush_prob()
+        return pair, two_pair, three, straight, flush, fullhouse, quad, straightflush
+        
